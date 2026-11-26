@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Free JJS Emotes</title>
 <style>
-  /* Lure (legit free-emote site) -> iPhone 17 lock screen + fake virus notifications + error sounds -> reveal */
+  /* Lure (legit free-emote site) -> iPhone 17 lock screen + fake virus notifications + iOS-style sounds -> reveal */
   :root{
     --bg:#0b0d14;--bg2:#141826;--card:#1a1f30;--line:#2a3048;
     --brand:#6c5ce7;--brand2:#a29bfe;--cyan:#22e6ff;--lime:#b6ff3c;--gold:#ffcf3b;
@@ -266,20 +266,30 @@
     $('#dte').textContent=days[n.getDay()]+', '+mons[n.getMonth()]+' '+n.getDate();
   }
 
+  // ---- iOS-style notification sounds (synthesized bells, no files) ----
   function audio(){ if(!ac){ try{ac=new (window.AudioContext||window.webkitAudioContext)();}catch(e){ac=null;} } if(ac&&ac.state==='suspended')ac.resume(); return ac; }
-  function tone(freq,start,dur,type,vol){
-    var c=audio();if(!c)return;
-    var o=c.createOscillator(),g=c.createGain();
-    o.type=type||'square';o.frequency.setValueAtTime(freq,c.currentTime+start);
-    g.gain.setValueAtTime(0,c.currentTime+start);
-    g.gain.linearRampToValueAtTime(vol||0.25,c.currentTime+start+0.01);
-    g.gain.exponentialRampToValueAtTime(0.0001,c.currentTime+start+dur);
-    o.connect(g);g.connect(c.destination);
-    o.start(c.currentTime+start);o.stop(c.currentTime+start+dur+0.02);
+  var out=null;
+  function outNode(){var c=audio();if(!c)return null;if(!out){out=c.createDynamicsCompressor();out.connect(c.destination);}return out;}
+  // glassy marimba/bell voice (sine partials + fast exp decay) = the iOS alert timbre
+  function bell(freq,t0,dur,vol){
+    var c=audio();if(!c)return;var dst=outNode();if(!dst)return;var now=c.currentTime+t0;
+    var partials=[[1,1],[2.0,0.42],[3.01,0.22],[4.17,0.10]];
+    var m=c.createGain();m.gain.value=vol;m.connect(dst);
+    partials.forEach(function(p){
+      var o=c.createOscillator(),g=c.createGain();
+      o.type='sine';o.frequency.setValueAtTime(freq*p[0],now);
+      g.gain.setValueAtTime(0,now);
+      g.gain.linearRampToValueAtTime(p[1],now+0.004);
+      g.gain.exponentialRampToValueAtTime(0.0001,now+dur);
+      o.connect(g);g.connect(m);o.start(now);o.stop(now+dur+0.03);
+    });
   }
-  function errSound(){ tone(300,0,0.12,'square',0.3); tone(200,0.13,0.18,'square',0.3); }
-  function dingBad(){ tone(660,0,0.08,'triangle',0.25); tone(440,0.09,0.22,'sawtooth',0.28); }
-  function alarm(){ for(var i=0;i<4;i++){ tone(880,i*0.18,0.1,'square',0.28); tone(620,i*0.18+0.09,0.09,'square',0.28);} }
+  // classic iOS "Tri-tone": three glassy ascending notes (G5-C6-E6)
+  function errSound(){ bell(783.99,0,0.52,0.34); bell(1046.50,0.13,0.52,0.34); bell(1318.51,0.26,0.64,0.36); }
+  // soft iOS "Note" ding: two bright bells (E6 -> A6)
+  function dingBad(){ bell(1318.51,0,0.5,0.34); bell(1760.00,0.1,0.62,0.3); }
+  // urgent iOS alarm (Radar-style): repeated high double-beep
+  function alarm(){ for(var k=0;k<3;k++){ bell(1244.51,k*0.46,0.22,0.36); bell(1244.51,k*0.46+0.17,0.28,0.36); } }
 
   var NOTES=[
     {app:'Security',ic:'🛡️',bg:'#ff3b30',ti:'Threat Detected',tx:NAME+', a virus was found on your iPhone.',snd:dingBad},
